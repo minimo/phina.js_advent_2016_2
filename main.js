@@ -10,13 +10,22 @@ var SC_H = 320;
 var ASSETS = {
   image: {
     "player": "assets/chara01_a1.png",
+  },
+  tmx: {
+    "map": "assets/map.tmx", 
   }
+
 };
 
 phina.define('MainScene', {
   superClass: 'phina.display.DisplayScene',
   init: function() {
     this.superInit({width:SC_W, height: SC_H});
+
+    var tmx = phina.asset.AssetManager.get("tmx", "map");
+    this.map = phina.display.Sprite(tmx.image)
+      .setOrigin(0, 0)
+      .addChildTo(this);
 
     this.player = Player()
         .addChildTo(this)
@@ -67,7 +76,7 @@ phina.define('Player', {
         this.move = false;
     }
 
-    if (e.ticker.frame % 10 == 0 && this.move) {
+    if (e.ticker.frame % 15 == 0 && this.move) {
         this.index = (this.index+1)%4;
         this.frameIndex = this.frame[this.index];
     }

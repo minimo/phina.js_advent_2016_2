@@ -307,9 +307,11 @@ phina.define("phina.asset.TiledMap", {
             }
             //透過色設定取得
             t.trans = tileset.getElementsByTagName('image')[0].getAttribute('trans');
-            t.transR = parseInt(t.trans.substring(0, 2), 16);
-            t.transG = parseInt(t.trans.substring(2, 4), 16);
-            t.transB = parseInt(t.trans.substring(4, 6), 16);
+            if (t.trans) {
+                t.transR = parseInt(t.trans.substring(0, 2), 16);
+                t.transG = parseInt(t.trans.substring(2, 4), 16);
+                t.transB = parseInt(t.trans.substring(4, 6), 16);
+            }
 
             data.push(t);
         });
