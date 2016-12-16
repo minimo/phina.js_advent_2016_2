@@ -11,6 +11,7 @@ var ASSETS = {
   image: {
     "player": "assets/chara01_a1.png",
   },
+  //LoadingSceneで読み込む場合の設定
   tmx: {
     "map": "assets/map.tmx",
   }
@@ -21,11 +22,16 @@ phina.define('MainScene', {
   init: function() {
     this.superInit({width:SC_W, height: SC_H});
 
+    this.mapBase = phina.display.DisplayElement()
+      .setPosition(0, 0)
+      .addChildTo(this);
+
+    //.tmxファイルからマップをイメージとして取得し、スプライトで表示
     this.tmx = phina.asset.AssetManager.get("tmx", "map");
     this.map = phina.display.Sprite(this.tmx.image)
       .setOrigin(0, 0)
       .setPosition(0, 0)
-      .addChildTo(this);
+      .addChildTo(this.mapBase);
     this.map.tweener.clear().setUpdateType('fps');
     
     this.player = Player()
@@ -34,17 +40,6 @@ phina.define('MainScene', {
 
     this.moving = false;
     this.tweener.clear().setUpdateType('fps');
-/*
-    var that = this;
-    phina.display.Label({fontSize:20}).addChildTo(this).setPosition(0,0).setOrigin(0, 0)
-      .update = function() {
-        this.text = "map x:"+~~that.map.x+" y:"+~~that.map.y;
-      }
-    phina.display.Label({fontSize:20}).addChildTo(this).setPosition(0,64).setOrigin(0, 0)
-      .update = function() {
-        this.text = "x:"+~~that.player.x+" y:"+~~that.player.y;
-      }
-*/
   },
 
   update: function() {
@@ -98,6 +93,8 @@ phina.define('MainScene', {
 
     //マップデータから'Collision'レイヤーを取得
     var collision = this.tmx.getMapData("collision");
+
+    //指定座標にマップチップがあると真を返す
     var chip = collision[mapy * this.tmx.width + mapx];
     if (chip === -1) return true;
     return false;
