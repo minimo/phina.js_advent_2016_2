@@ -58,7 +58,7 @@ phina.define("phina.asset.TiledMap", {
     },
 
     //指定マップレイヤーを配列として取得
-    getMap: function(layerName) {
+    getMapData: function(layerName) {
         //レイヤー検索
         var data = null;
         for(var i = 0; i < this.layers.length; i++) {
@@ -229,19 +229,20 @@ phina.define("phina.asset.TiledMap", {
 
         for (var i = 0; i < this.layers.length; i++) {
             //マップレイヤー
-            if (this.layers[i].type == "layer") {
+            if (this.layers[i].type == "layer" && this.layers[i].visible != "0") {
                 if (layerName === undefined || layerName === this.layers[i].name) {
                     var layer = this.layers[i];
                     var mapdata = layer.data;
                     var width = layer.width;
                     var height = layer.height;
+                    var opacity = layer.opacity || 1.0;
                     var count = 0;
                     for (var y = 0; y < height; y++) {
                         for (var x = 0; x < width; x++) {
                             var index = mapdata[count];
                                 if (index !== -1) {
                                 //マップチップを配置
-                                this._setMapChip(canvas, index, x * this.tilewidth, y * this.tileheight);
+                                this._setMapChip(canvas, index, x * this.tilewidth, y * this.tileheight, opacity);
                             }
                             count++;
                         }
@@ -264,7 +265,7 @@ phina.define("phina.asset.TiledMap", {
     },
 
     //キャンバスの指定した座標にマップチップのイメージをコピーする
-    _setMapChip: function(canvas, index, x, y) {
+    _setMapChip: function(canvas, index, x, y, opacity) {
         //タイルセットからマップチップを取得
         var chip = this.tilesets.chips[index];
         var image = phina.asset.AssetManager.get('image', chip.image);
