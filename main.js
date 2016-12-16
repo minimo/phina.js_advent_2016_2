@@ -14,7 +14,6 @@ var ASSETS = {
   tmx: {
     "map": "assets/map.tmx", 
   }
-
 };
 
 phina.define('MainScene', {
@@ -22,26 +21,71 @@ phina.define('MainScene', {
   init: function() {
     this.superInit({width:SC_W, height: SC_H});
 
-    var tmx = phina.asset.AssetManager.get("tmx", "map");
-    this.map = phina.display.Sprite(tmx.image)
+    this.tmx = phina.asset.AssetManager.get("tmx", "map");
+    this.map = phina.display.Sprite(this.tmx.image)
       .setOrigin(0, 0)
+      .setPosition(0, 0)
       .addChildTo(this);
-
+    this.map.tweener.clear().setUpdateType('fps');
+    
     this.player = Player()
-        .addChildTo(this)
-        .setPosition(SC_W/2, SC_H/2);
+        .setPosition(160, 160)
+        .addChildTo(this.map);
+
+    this.moving = false;
+    this.tweener.clear().setUpdateType('fps');
+
+    var that = this;
+    phina.display.Label({fontSize:20}).addChildTo(this).setPosition(0,0).setOrigin(0, 0)
+      .update = function() {
+        this.text = "map x:"+~~that.map.x+" y:"+~~that.map.y;
+      }
+    phina.display.Label({fontSize:20}).addChildTo(this).setPosition(0,64).setOrigin(0, 0)
+      .update = function() {
+        this.text = "x:"+~~that.player.x+" y:"+~~that.player.y;
+      }
   },
 
   update: function() {
     var kb = app.keyboard;
-    if (kb.getKey("up")) {
+    if (!this.moving) {
+      if (kb.getKey("up")) {
+        this.moving = true;
+        this.player.tweener.clear().by({y: -32}, 30);
+        this.player.setDirection("up");
+        if (this.player.y > 160 && this.player.y < this.map.height-SC_H) this.map.tweener.clear().by({y: 32}, 30);
+      }
+      if (kb.getKey("down")) {
+        this.moving = true;
+        this.player.tweener.clear().by({y: 32}, 30);
+        this.player.setDirection("down");
+        if (this.player.y > 128 && this.player.y < this.map.height-SC_H) this.map.tweener.clear().by({y: -32}, 30);
+      }
+      if (kb.getKey("left")) {
+        this.moving = true;
+        this.player.tweener.clear().by({x: -32}, 30);
+        this.player.setDirection("left");
+        if (this.player.x > 160 && this.player.x < this.map.width-SC_W) this.map.tweener.clear().by({x: 32}, 30);
+      }
+      if (kb.getKey("right")) {
+        this.moving = true;
+        this.player.tweener.clear().by({x: 32}, 30);
+        this.player.setDirection("right");
+        if (this.player.x > 128 && this.player.x < this.map.width-SC_W) this.map.tweener.clear().by({x: -32}, 30);
+      }
+      if (this.moving) {
+        this.tweener.clear().wait(30).call(function(){this.moving = false;}.bind(this));
+      }
     }
-    if (kb.getKey("left")) {
-    }
-    if (kb.getKey("right")) {
-    }
-    if (kb.getKey("down")) {
-    }
+  },
+
+  //マップ衝突判定
+  mapCollision: function(x, y) {
+    //マップデータから'Collision'レイヤーを取得
+    var collision = this.tmx.getMapData("Collision");
+    var chip = collision[y * 32 + x];
+    if (chip === "0") return true;
+    return false;
   },
 });
 
@@ -49,6 +93,8 @@ phina.define('Player', {
   superClass: 'phina.display.Sprite',
   init: function() {
     this.superInit("player", 24, 32);
+
+    this.setOrigin(0, 0);
 
     this.frameUp = [0, 1, 2, 1];
     this.frameRight = [12, 13, 14, 13];
@@ -58,50 +104,57 @@ phina.define('Player', {
     this.frame = this.frameDown;
     this.index = 0;
     this.frameIndex = 25;
-    this.move = true;
+    this.moving = false;
+
+    this.tweener.clear().setUpdateType('fps');
+    this.time = 0;
   },
 
   update: function(e) {
-    this.move = true;
-    var kb = app.keyboard;
-    if (kb.getKey("left")) {
-        this.frame = this.frameLeft;
-    } else if (kb.getKey("right")) {
-        this.frame = this.frameRight;
-    } else if (kb.getKey("up")) {
-        this.frame = this.frameUp;
-    } else if (kb.getKey("down")) {
-        this.frame = this.frameDown;
-    } else {
-        this.move = false;
+    if (e.ticker.frame % 15 == 0) {
+      this.index = (this.index+1)%4;
+      this.frameIndex = this.frame[this.index];
     }
+    this.time++;
+  },
 
-    if (e.ticker.frame % 15 == 0 && this.move) {
-        this.index = (this.index+1)%4;
-        this.frameIndex = this.frame[this.index];
+  setDirection: function(dir) {
+    switch (dir) {
+      case "up":
+        this.frame = this.frameUp;
+        break;
+      case "down":
+        this.frame = this.frameDown;
+        break;
+      case "left":
+        this.frame = this.frameLeft;
+        break;
+      case "right":
+        this.frame = this.frameRight;
+        break;
     }
   },
 });
 
 phina.define("SceneFlow", {
-    superClass: "phina.game.ManagerScene",
+  superClass: "phina.game.ManagerScene",
 
-    init: function() {
-        this.superInit({
-            startLabel: "load",
-            scenes: [{
-                label: "load",
-                className: "phina.game.LoadingScene",
-                arguments: {
-                    assets: ASSETS,
-                },
-                nextLabel: "main",
-            },{
-                label: "main",
-                className: "MainScene",
-            }],
-        });
-    }
+  init: function() {
+    this.superInit({
+      startLabel: "load",
+      scenes: [{
+        label: "load",
+        className: "phina.game.LoadingScene",
+        arguments: {
+          assets: ASSETS,
+        },
+        nextLabel: "main",
+      },{
+        label: "main",
+        className: "MainScene",
+      }],
+    });
+  }
 });
 
 phina.main(function() {

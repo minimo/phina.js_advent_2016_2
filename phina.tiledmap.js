@@ -53,6 +53,18 @@ phina.define("phina.asset.TiledMap", {
         return this.image;
     },
 
+    //指定マップレイヤーを配列として取得
+    getMap: function(mapLayerName) {
+        //レイヤー検索
+        var data = null;
+        for(var i = 0; i < this.layers.length; i++) {
+            if (this.layers[i].name == mapLayerName) {
+                data = this.layers[i].data;
+            }
+        }
+        return data;
+    },
+
     //オブジェクトグループを配列にして取得
     getObjectGroup: function(groupName) {
         groupName = groupName || null;
