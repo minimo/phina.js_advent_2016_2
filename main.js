@@ -49,17 +49,19 @@ phina.define('MainScene', {
   update: function() {
     var kb = app.keyboard;
     if (!this.moving) {
+      var mx = -this.map.x;
+      var my = -this.map.y;
       if (kb.getKey("up")) {
         this.moving = true;
         this.player.tweener.clear().by({y: -32}, 30);
         this.player.setDirection("up");
-        if (this.player.y > 160 && this.player.y < this.map.height-SC_H) this.map.tweener.clear().by({y: 32}, 30);
+        if (my > 0) this.map.tweener.clear().by({y: 32}, 30);
       }
       if (kb.getKey("down")) {
         this.moving = true;
         this.player.tweener.clear().by({y: 32}, 30);
         this.player.setDirection("down");
-        if (this.player.y > 128 && this.player.y < this.map.height-SC_H) this.map.tweener.clear().by({y: -32}, 30);
+        if (my > this.map.height)this.map.tweener.clear().by({y: -32}, 30);
       }
       if (kb.getKey("left")) {
         this.moving = true;
