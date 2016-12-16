@@ -49,8 +49,12 @@ phina.define("phina.asset.TiledMap", {
     },
 
     //マップイメージ取得
-    getImage: function() {
-        return this.image;
+    getImage: function(layerName) {
+        if (layerName === undefined) {
+            return this.image;
+        } else {
+            return this._generateImage(layerName);
+        }
     },
 
     //指定マップレイヤーを配列として取得
@@ -211,7 +215,7 @@ phina.define("phina.asset.TiledMap", {
     },
 
     //マップイメージ作成
-    _generateImage: function() {
+    _generateImage: function(layerName) {
         var numLayer = 0;
         for (var i = 0; i < this.layers.length; i++) {
             if (this.layers[i].type == "layer" || this.layers[i].type == "imagelayer") numLayer++;
@@ -225,27 +229,31 @@ phina.define("phina.asset.TiledMap", {
         for (var i = 0; i < this.layers.length; i++) {
             //マップレイヤー
             if (this.layers[i].type == "layer") {
-                var layer = this.layers[i];
-                var mapdata = layer.data;
-                var width = layer.width;
-                var height = layer.height;
-                var count = 0;
-                for (var y = 0; y < height; y++) {
-                    for (var x = 0; x < width; x++) {
-                        var index = mapdata[count];
-                        if (index !== -1) {
-                            //マップチップを配置
-                            this._setMapChip(canvas, index, x * this.tilewidth, y * this.tileheight);
+                if (layerName === undefined || layerName === this.layers[i].name) {
+                    var layer = this.layers[i];
+                    var mapdata = layer.data;
+                    var width = layer.width;
+                    var height = layer.height;
+                    var count = 0;
+                    for (var y = 0; y < height; y++) {
+                        for (var x = 0; x < width; x++) {
+                            var index = mapdata[count];
+                                if (index !== -1) {
+                                //マップチップを配置
+                                this._setMapChip(canvas, index, x * this.tilewidth, y * this.tileheight);
+                            }
+                            count++;
                         }
-                        count++;
                     }
                 }
             }
             //イメージレイヤー
             if (this.layers[i].type == "imagelayer") {
-                var len = this.layers[i];
-                var image = phina.asset.AssetManager.get('image', this.layers[i].image.source);
-                canvas.context.drawImage(image.domElement, this.layers[i].x, this.layers[i].y);
+                if (layerName === undefined || layerName === this.layers[i].name) {
+                    var len = this.layers[i];
+                    var image = phina.asset.AssetManager.get('image', this.layers[i].image.source);
+                    canvas.context.drawImage(image.domElement, this.layers[i].x, this.layers[i].y);
+                }
             }
         }
 
