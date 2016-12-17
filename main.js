@@ -43,6 +43,7 @@ phina.define('MainScene', {
 
     this.moving = false;
     this.textWait = false;
+    this.talkingChr = null;
     this.tweener.clear().setUpdateType('fps');
 
     //メッセージウィンドウ
@@ -109,11 +110,12 @@ phina.define('MainScene', {
       if (kb.getKey("z")) {
         if (!this.moving && !this.textWait) {
           var ax = this.player.x, ay = this.player.y;
+          var dir = "down";
           switch(this.player.direction) {
-            case "up": ay -= 32; break;
-            case "down": ay += 32; break;
-            case "left": ax -= 32; break;
-            case "right": ax += 32; break;
+            case "up": ay -= 32; dir = "down"; break;
+            case "down": ay += 32; dir = "up"; break;
+            case "left": ax -= 32; dir = "right"; break;
+            case "right": ax += 32; dir = "left"; break;
           }
           var chr = this.checkMap(ax, ay);
           if (chr && chr.data.properties.talk1) {
@@ -123,6 +125,9 @@ phina.define('MainScene', {
             if (chr.data.properties.talk2) {
               this.labelArea.text += "\n"+chr.data.properties.talk2;
             }
+            chr.setDirection(dir);
+            chr.wait = true;
+            this.talkingChr = chr;
           }
         }
       }
@@ -138,6 +143,9 @@ phina.define('MainScene', {
         this.moving = true;
         this.textWait = false;
         this.labelArea.text = "";
+        this.talkingChr.wait = false;
+        this.talkingChr.moveWaitCount = 60;
+        this.talkingChr = null;
         this.tweener.clear().wait(spd).call(function(){this.moving = false;}.bind(this));
       }
     }
@@ -182,6 +190,8 @@ phina.define('MainScene', {
         .setPosition(npc.x, npc.y)
         .addChildTo(this.map);
         chr.data = npc;
+        chr.move = chr.data.properties.move == "true"? true: false;
+        chr.parentScene = this;
     }
   },
 });
@@ -208,6 +218,9 @@ phina.define('Character', {
     this.index = 0;
     this.sprite.frameIndex = 25;
     this.moving = false;
+    this.move = false;
+    this.moveWaitCount = 30;
+    this.wait = false;
 
     this.tweener.clear().setUpdateType('fps');
     this.time = 0;
@@ -218,6 +231,25 @@ phina.define('Character', {
       this.index = (this.index+1)%4;
       this.sprite.frameIndex = this.frame[this.index];
     }
+
+    //うろうろ動く
+    if (!this.wait && this.move && this.moveWaitCount == 0) {
+      this.moveWaitCount = 90;
+      var ax = 0, ay = 0;
+      var dice = Math.randint(0, 3);
+      var dir = ["up", "down", "left", "right"];
+      switch (dir[dice]) {
+        case "up": ay = -32; break;
+        case "down": ay = 32; break;
+        case "left": ax = -32; break;
+        case "right": ax = 32; break;
+      }
+      if (!this.parentScene.mapCollision(this.x+ax, this.y+ay)) this.tweener.clear().by({x: ax, y: ay}, 30);
+
+      this.setDirection(dir[dice]);
+    }
+
+    this.moveWaitCount--;
     this.time++;
   },
 
