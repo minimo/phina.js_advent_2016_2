@@ -42,13 +42,36 @@ phina.define('MainScene', {
     this.player = Character(0).setPosition(160, 160).addChildTo(this.map);
 
     this.moving = false;
+    this.textWait = false;
     this.tweener.clear().setUpdateType('fps');
+
+    //メッセージウィンドウ
+    var that = this;
+    this.messageWindow = phina.display.RectangleShape({
+      cornerRadius: 10,
+      width: SC_W*0.9,
+      height:SC_H*0.3,
+      strokeWidth: 5,
+      stroke: 'white',
+      fill: 'black',
+    }).addChildTo(this).setPosition(SC_W*0.5, SC_H*0.8);
+    this.messageWindow.update = function() {
+      if (that.labelArea.text == "") this.visible = false;
+      else this.visible = true;
+    }
+    this.labelArea = phina.ui.LabelArea({
+      text: "",
+      width: SC_W*0.9-10,
+      height: SC_H*0.3-10,
+      fill: 'white',
+      fontSize: 15,
+    }).addChildTo(this.messageWindow).setPosition(5, 5);
   },
 
   update: function() {
+    var spd = 20;
     var kb = app.keyboard;
-    if (!this.moving) {
-      var spd = 20;
+    if (!this.moving && !this.textWait) {
       var mx = -this.map.x;
       var my = -this.map.y;
       if (kb.getKey("up")) {
@@ -83,7 +106,38 @@ phina.define('MainScene', {
           if (mx < this.map.width && this.player.x > 128 && this.player.x < this.map.width-SC_W/2) this.map.tweener.clear().by({x: -32}, spd);
         }
       }
+      if (kb.getKey("z")) {
+        if (!this.moving && !this.textWait) {
+          var ax = this.player.x, ay = this.player.y;
+          switch(this.player.direction) {
+            case "up": ay -= 32; break;
+            case "down": ay += 32; break;
+            case "left": ax -= 32; break;
+            case "right": ax += 32; break;
+          }
+          var chr = this.checkMap(ax, ay);
+          if (chr && chr.data.properties.talk1) {
+            this.moving = true;
+            this.textWait = true;
+            this.labelArea.text = chr.data.properties.talk1;
+            if (chr.data.properties.talk2) {
+              this.labelArea.text += "\n"+chr.data.properties.talk2;
+            }
+          }
+        }
+      }
+
       if (this.moving) {
+        this.tweener.clear().wait(spd).call(function(){this.moving = false;}.bind(this));
+      }
+    }
+
+    //メッセージ表示待機の解除
+    if (!this.moving && this.textWait) {
+      if (kb.getKey("z")) {
+        this.moving = true;
+        this.textWait = false;
+        this.labelArea.text = "";
         this.tweener.clear().wait(spd).call(function(){this.moving = false;}.bind(this));
       }
     }
@@ -111,13 +165,12 @@ phina.define('MainScene', {
     return false;
   },
 
-  checkMap: function() {
-    //マップ上キャラクタとの衝突判定
+  //NPC存在チェック
+  checkMap: function(x, y) {
     var children = this.map.children;
     for (var i = 0; i < children.length; i++) {
       var chr = children[i];
-      if (chr.type != 0 && x == chr.x && y == chr.y) {
-      }
+      if (chr.type != 0 && x == chr.x && y == chr.y) return chr;
     }
   },
 
@@ -128,6 +181,7 @@ phina.define('MainScene', {
       var chr = Character(npc.properties.chrtype)
         .setPosition(npc.x, npc.y)
         .addChildTo(this.map);
+        chr.data = npc;
     }
   },
 });
@@ -144,8 +198,9 @@ phina.define('Character', {
       .addChildTo(this);
 
     this.sprite.setFrameTrimming((type%4)*72, Math.floor(type/4)*128, 72, 128);
+    this.direction = "down";
     this.frameUp = [0, 1, 2, 1];
-    this.frameRight = [3, 4, 5, 3];
+    this.frameRight = [3, 4, 5, 4];
     this.frameDown = [6, 7, 8, 7];
     this.frameLeft = [9, 10, 11, 10];
 
@@ -169,15 +224,19 @@ phina.define('Character', {
   setDirection: function(dir) {
     switch (dir) {
       case "up":
+        this.direction = "up";
         this.frame = this.frameUp;
         break;
       case "down":
+        this.direction = "down";
         this.frame = this.frameDown;
         break;
       case "left":
+        this.direction = "left";
         this.frame = this.frameLeft;
         break;
       case "right":
+        this.direction = "right";
         this.frame = this.frameRight;
         break;
     }
