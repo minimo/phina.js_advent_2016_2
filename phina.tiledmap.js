@@ -90,6 +90,7 @@ phina.define("phina.asset.TiledMap", {
                         obj.objects[r] = obj2;
                     }
                 }
+                if (groupName !== null) return obj;
                 ls.push(obj);
             }
         }

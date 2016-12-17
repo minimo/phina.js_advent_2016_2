@@ -57,8 +57,14 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <objectgroup name="event">
-  <object id="5" x="416" y="160" width="32" height="32"/>
+ <objectgroup name="NPCGroup">
+  <object id="5" name="NPC1" type="npc" x="192" y="224" width="32" height="32">
+   <properties>
+    <property name="chrtype" type="int" value="2"/>
+    <property name="move" type="bool" value="false"/>
+    <property name="talk" value="ここはカボイの村です。"/>
+   </properties>
+  </object>
  </objectgroup>
  <layer name="collision" width="20" height="20" visible="0">
   <data encoding="csv">

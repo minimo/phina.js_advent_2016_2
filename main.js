@@ -33,10 +33,13 @@ phina.define('MainScene', {
       .setPosition(0, 0)
       .addChildTo(this.mapBase);
     this.map.tweener.clear().setUpdateType('fps');
-    
-    this.player = Player()
-        .setPosition(160, 160)
-        .addChildTo(this.map);
+
+    //オブジェクトグループの取得
+    this.npc = this.tmx.getObjectGroup("NPCGroup");
+    this.addNPC();
+
+    //プレイヤー用キャラクタ    
+    this.player = Character(0).setPosition(160, 160).addChildTo(this.map);
 
     this.moving = false;
     this.tweener.clear().setUpdateType('fps');
@@ -50,7 +53,7 @@ phina.define('MainScene', {
       var my = -this.map.y;
       if (kb.getKey("up")) {
         this.player.setDirection("up");
-        if (this.player.y > 0 && this.mapCollision(this.player.x, this.player.y-32)) {
+        if (this.player.y > 0 && !this.mapCollision(this.player.x, this.player.y-32)) {
           this.moving = true;
           this.player.tweener.clear().by({y: -32}, spd);
           if (0 < my && this.player.y < this.map.height - SC_H/2+32) this.map.tweener.clear().by({y: 32}, spd);
@@ -58,7 +61,7 @@ phina.define('MainScene', {
       }
       if (kb.getKey("down")) {
         this.player.setDirection("down");
-        if (this.player.y < this.map.height-32 && this.mapCollision(this.player.x, this.player.y+32)) {
+        if (this.player.y < this.map.height-32 && !this.mapCollision(this.player.x, this.player.y+32)) {
           this.moving = true;
           this.player.tweener.clear().by({y: 32}, spd);
           if (my < this.map.height && this.player.y > 128 && this.player.y < this.map.height-SC_H/2)this.map.tweener.clear().by({y: -32}, spd);
@@ -66,7 +69,7 @@ phina.define('MainScene', {
       }
       if (kb.getKey("left")) {
         this.player.setDirection("left");
-        if (this.player.x > 0 && this.mapCollision(this.player.x-32, this.player.y)) {
+        if (this.player.x > 0 && !this.mapCollision(this.player.x-32, this.player.y)) {
           this.moving = true;
           this.player.tweener.clear().by({x: -32}, spd);
           if (0 < mx && this.player.x < this.map.width - SC_W/2+32) this.map.tweener.clear().by({x: 32}, spd);
@@ -74,7 +77,7 @@ phina.define('MainScene', {
       }
       if (kb.getKey("right")) {
         this.player.setDirection("right");
-        if (this.player.x < this.map.width-32 && this.mapCollision(this.player.x+32, this.player.y)) {
+        if (this.player.x < this.map.width-32 && !this.mapCollision(this.player.x+32, this.player.y)) {
           this.moving = true;
           this.player.tweener.clear().by({x: 32}, spd);
           if (mx < this.map.width && this.player.x > 128 && this.player.x < this.map.width-SC_W/2) this.map.tweener.clear().by({x: -32}, spd);
@@ -96,25 +99,55 @@ phina.define('MainScene', {
 
     //指定座標にマップチップがあると真を返す
     var chip = collision[mapy * this.tmx.width + mapx];
-    if (chip === -1) return true;
+    if (chip !== -1) return true;
+
+    //マップ上キャラクタとの衝突判定
+    var children = this.map.children;
+    for (var i = 0; i < children.length; i++) {
+      var chr = children[i];
+      if (chr.type != 0 && x == chr.x && y == chr.y) return true;
+    }
+
     return false;
+  },
+
+  checkMap: function() {
+    //マップ上キャラクタとの衝突判定
+    var children = this.map.children;
+    for (var i = 0; i < children.length; i++) {
+      var chr = children[i];
+      if (chr.type != 0 && x == chr.x && y == chr.y) {
+      }
+    }
+  },
+
+  //Non Player Characterをマップに追加
+  addNPC: function() {
+    for(var i = 0; i < this.npc.objects.length; i++) {
+      var npc = this.npc.objects[i];
+      var chr = Character(npc.properties.chrtype)
+        .setPosition(npc.x, npc.y)
+        .addChildTo(this.map);
+    }
   },
 });
 
-phina.define('Player', {
+phina.define('Character', {
   superClass: 'phina.display.DisplayElement',
-  init: function() {
+  init: function(type) {
     this.superInit();
     this.setOrigin(0, 0);
 
+    this.type = type;
     this.sprite = phina.display.Sprite("player", 24, 32)
       .setPosition(16, 10)
       .addChildTo(this);
 
+    this.sprite.setFrameTrimming((type%4)*72, Math.floor(type/4)*128, 72, 128);
     this.frameUp = [0, 1, 2, 1];
-    this.frameRight = [12, 13, 14, 13];
-    this.frameDown = [24, 25, 26, 25];
-    this.frameLeft = [36, 37, 38, 37];
+    this.frameRight = [3, 4, 5, 3];
+    this.frameDown = [6, 7, 8, 7];
+    this.frameLeft = [9, 10, 11, 10];
 
     this.frame = this.frameDown;
     this.index = 0;
@@ -185,3 +218,38 @@ phina.main(function() {
 
   app.run();
 });
+
+//スプライト機能拡張
+phina.display.Sprite.prototype.setFrameTrimming = function(x, y, width, height) {
+  this._frameTrimX = x || 0;
+  this._frameTrimY = y || 0;
+  this._frameTrimWidth = width || this.image.domElement.width - this._frameTrimX;
+  this._frameTrimHeight = height || this.image.domElement.height - this._frameTrimY;
+  return this;
+}
+
+phina.display.Sprite.prototype.setFrameIndex = function(index, width, height) {
+  var sx = this._frameTrimX || 0;
+  var sy = this._frameTrimY || 0;
+  var sw = this._frameTrimWidth  || (this.image.domElement.width-sx);
+  var sh = this._frameTrimHeight || (this.image.domElement.height-sy);
+
+  var tw  = width || this.width;      // tw
+  var th  = height || this.height;    // th
+  var row = ~~(sw / tw);
+  var col = ~~(sh / th);
+  var maxIndex = row*col;
+  index = index%maxIndex;
+
+  var x   = index%row;
+  var y   = ~~(index/row);
+  this.srcRect.x = sx+x*tw;
+  this.srcRect.y = sy+y*th;
+  this.srcRect.width  = tw;
+  this.srcRect.height = th;
+
+  this._frameIndex = index;
+
+  return this;
+}
+
