@@ -70,7 +70,7 @@ phina.define("phina.asset.TiledMap", {
         return null;
     },
 
-    //オブジェクトグループを配列にして取得
+    //オブジェクトグループを取得（指定が無い場合、全レイヤーを配列にして返す）
     getObjectGroup: function(groupName) {
         groupName = groupName || null;
         var ls = [];
@@ -78,22 +78,32 @@ phina.define("phina.asset.TiledMap", {
         for (var i = 0; i < len; i++) {
             if (this.layers[i].type == "objectgroup") {
                 if (groupName == null || groupName == this.layers[i].name) {
-                    //ディープコピー
-                    var obj = {}.$safe(this.layers[i]);
-                    obj.objects = [];
-                    var len2 = this.layers[i].objects.length;
-                    for (var r = 0; r < len2; r++) {
-                        var obj2 = {
-                            properties: {}.$safe(this.layers[i].objects[r].properties),
-                        }.$safe(this.layers[i].objects[r]);
-                        obj.objects[r] = obj2;
-                    }
+                    //レイヤー情報をクローンする
+                    var obj = this._cloneObjectLayer(this.layers[i]);
                     if (groupName !== null) return obj;
                 }
                 ls.push(obj);
             }
         }
         return ls;
+    },
+
+    //オブジェクトレイヤーをクローンして返す
+    _cloneObjectLayer: function(srcLayer) {
+        var result = {}.$safe(srcLayer);
+        result.objects = [];
+        //レイヤー内オブジェクトのコピー
+        srcLayer.objects.forEach(function(obj){
+            var resObj = {
+                properties: {}.$safe(obj.properties),
+            }.$extend(obj);
+            if (obj.ellipse) resObj.ellipse = obj.ellipse;
+            if (obj.gid) resObj.gid = obj.gid;
+            if (obj.polygon) resObj.polygon = obj.polygon.clone();
+            if (obj.polyline) resObj.polyline = obj.polyline.clone();
+            result.objects.push(resObj);
+        });
+        return result;
     },
 
     _parse: function(data) {
@@ -250,8 +260,20 @@ phina.define("phina.asset.TiledMap", {
                     }
                 }
             }
+            //オブジェクトグループ
+            if (this.layers[i].type == "objectgroup" && this.layers[i].visible != "0") {
+                if (layerName === undefined || layerName === this.layers[i].name) {
+                    var layer = this.layers[i];
+                    var opacity = layer.opacity || 1.0;
+                    layer.objects.forEach(function(e) {
+                        if (e.gid) {
+                            this._setMapChip(canvas, e.gid, e.x, e.y, opacity);
+                        }
+                    }.bind(this));
+                }
+            }
             //イメージレイヤー
-            if (this.layers[i].type == "imagelayer") {
+            if (this.layers[i].type == "imagelayer" && this.layers[i].visible != "0") {
                 if (layerName === undefined || layerName === this.layers[i].name) {
                     var len = this.layers[i];
                     var image = phina.asset.AssetManager.get('image', this.layers[i].image.source);
@@ -313,6 +335,16 @@ phina.define("phina.asset.TiledMap", {
         for (var i = 0; i < source.attributes.length; i++) {
             var val = source.attributes[i].value;
             val = isNaN(parseFloat(val))? val: parseFloat(val);
+            obj[source.attributes[i].name] = val;
+        }
+        return obj;
+    },
+
+    //XML属性をJSONに変換（Stringで返す）
+    _attrToJSON_str: function(source) {
+        var obj = {};
+        for (var i = 0; i < source.attributes.length; i++) {
+            var val = source.attributes[i].value;
             obj[source.attributes[i].name] = val;
         }
         return obj;
@@ -388,11 +420,46 @@ phina.define("phina.asset.TiledMap", {
                         type: "objectgroup",
                         objects: [],
                         name: layer.getAttribute("name"),
+                        x: parseFloat(layer.getAttribute("offsetx")) || 0,
+                        y: parseFloat(layer.getAttribute("offsety")) || 0,
+                        alpha: layer.getAttribute("opacity") || 1,
+                        color: layer.getAttribute("color") || null,
+                        draworder: layer.getAttribute("draworder") || null,
                     };
                     each.call(layer.childNodes, function(elm) {
                         if (elm.nodeType == 3) return;
                         var d = this._attrToJSON(elm);
                         d.properties = this._propertiesToJSON(elm);
+                        //子要素の解析
+                        if (elm.childNodes.length) {
+                            elm.childNodes.forEach(function(e) {
+                                if (e.nodeType == 3) return;
+                                //楕円
+                                if (e.nodeName == 'ellipse') {
+                                    d.ellipse = true;
+                                }
+                                //多角形
+                                if (e.nodeName == 'polygon') {
+                                    d.polygon = [];
+                                    var attr = this._attrToJSON_str(e);
+                                    var pl = attr.points.split(" ");
+                                    pl.forEach(function(str) {
+                                        var pts = str.split(",");
+                                        d.polygon.push({x: parseFloat(pts[0]), y: parseFloat(pts[1])});
+                                    });
+                                }
+                                //線分
+                                if (e.nodeName == 'polyline') {
+                                    d.polyline = [];
+                                    var attr = this._attrToJSON_str(e);
+                                    var pl = attr.points.split(" ");
+                                    pl.forEach(function(str) {
+                                        var pts = str.split(",");
+                                        d.polyline.push({x: parseFloat(pts[0]), y: parseFloat(pts[1])});
+                                    });
+                                }
+                            }.bind(this));
+                        }
                         l.objects.push(d);
                     }.bind(this));
                     l.properties = this._propertiesToJSON(layer);
