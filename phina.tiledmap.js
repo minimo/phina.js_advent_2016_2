@@ -1,17 +1,35 @@
 /*
  *  phina.tiledmap.js
- *  2016/9/10
+ *  2016/09/10
  *  @auther minimo  
  *  This Program is MIT license.
  *
  */
 
+/**
+ * @class phina.asset.TiledMap
+ * @extends phina.asset.Asset
+ * # TiledMapEditorで作成したtmxファイルを読み込みクラス
+ */
 phina.define("phina.asset.TiledMap", {
     superClass: "phina.asset.Asset",
 
+    /**
+     * @property image
+     * 作成されたマップ画像
+     */
     image: null,
 
+    /**
+     * @property tilesets
+     * タイルセット情報
+     */
     tilesets: null,
+
+    /**
+     * @property layers
+     * レイヤー情報が格納されている配列
+     */
     layers: null,
 
     init: function() {
@@ -48,16 +66,12 @@ phina.define("phina.asset.TiledMap", {
         xml.send(null);
     },
 
-    //マップイメージ取得
-    getImage: function(layerName) {
-        if (layerName === undefined) {
-            return this.image;
-        } else {
-            return this._generateImage(layerName);
-        }
-    },
-
-    //指定マップレイヤーを配列として取得
+    /**
+     * @method getMapData
+     * 指定したマップレイヤーを配列として取得します。
+     *
+     * @param {String} layerName 対象レイヤー名
+     */
     getMapData: function(layerName) {
         //レイヤー検索
         var data = null;
@@ -70,7 +84,14 @@ phina.define("phina.asset.TiledMap", {
         return null;
     },
 
-    //オブジェクトグループを取得（指定が無い場合、全レイヤーを配列にして返す）
+    /**
+     * @method getObjectGroup
+     * オブジェクトグループを取得します
+     *
+     * グループ指定が無い場合、全レイヤーを配列にして返します。
+     *
+     * @param {String} grounpName 対象オブジェクトグループ名
+     */
     getObjectGroup: function(groupName) {
         groupName = groupName || null;
         var ls = [];
@@ -88,7 +109,85 @@ phina.define("phina.asset.TiledMap", {
         return ls;
     },
 
-    //オブジェクトレイヤーをクローンして返す
+    /**
+     * @method getMapImage
+     * マップイメージの作成
+     *
+     * 複数のマップレイヤーを指定出来ます。
+     * 描画順序はTiledMapEditor側での指定順では無く、引数の順序となります（第一引数が一番下となる）
+     *
+     * @param {String}  対象レイヤー名
+     */
+    getImage: function(...args) {
+        var numLayer = 0;
+        for (var i = 0; i < this.layers.length; i++) {
+            if (this.layers[i].type == "layer" || this.layers[i].type == "imagelayer") numLayer++;
+        }
+        if (numLayer == 0) return null;
+
+        var generated = false;
+        var width = this.width * this.tilewidth;
+        var height = this.height * this.tileheight;
+        var canvas = phina.graphics.Canvas().setSize(width, height);
+
+        for (var i = 0; i < this.layers.length; i++) {
+            var find = args.indexOf(this.layers[i].name);
+            if (args.length == 0 || find >= 0) {
+                //マップレイヤー
+                if (this.layers[i].type == "layer" && this.layers[i].visible != "0") {
+                    var layer = this.layers[i];
+                    var mapdata = layer.data;
+                    var width = layer.width;
+                    var height = layer.height;
+                    var opacity = layer.opacity || 1.0;
+                    var count = 0;
+                    for (var y = 0; y < height; y++) {
+                        for (var x = 0; x < width; x++) {
+                            var index = mapdata[count];
+                                if (index !== -1) {
+                                //マップチップを配置
+                                this._setMapChip(canvas, index, x * this.tilewidth, y * this.tileheight, opacity);
+                            }
+                            count++;
+                        }
+                    }
+                    generated = true;
+                }
+                //オブジェクトグループ
+                if (this.layers[i].type == "objectgroup" && this.layers[i].visible != "0") {
+                    var layer = this.layers[i];
+                    var opacity = layer.opacity || 1.0;
+                    layer.objects.forEach(function(e) {
+                        if (e.gid) {
+                            this._setMapChip(canvas, e.gid, e.x, e.y, opacity);
+                        }
+                    }.bind(this));
+                    generated = true;
+                }
+                //イメージレイヤー
+                if (this.layers[i].type == "imagelayer" && this.layers[i].visible != "0") {
+                    var len = this.layers[i];
+                    var image = phina.asset.AssetManager.get('image', this.layers[i].image.source);
+                    canvas.context.drawImage(image.domElement, this.layers[i].x, this.layers[i].y);
+                    generated = true;
+                }
+            }
+        }
+
+        if (!generated) return null;
+
+        var texture = phina.asset.Texture();
+        texture.domElement = canvas.domElement;
+        return texture;
+    },
+
+    /**
+     * @method _cloneObjectLayer
+     * 引数として渡されたオブジェクトレイヤーをクローンして返します。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _cloneObjectLayer: function(srcLayer) {
         var result = {}.$safe(srcLayer);
         result.objects = [];
@@ -106,6 +205,13 @@ phina.define("phina.asset.TiledMap", {
         return result;
     },
 
+    /**
+     * @method _parse
+     * 取得したTiledMapEditのデータをパースします。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _parse: function(data) {
         //タイル属性情報取得
         var map = data.getElementsByTagName('map')[0];
@@ -151,7 +257,13 @@ phina.define("phina.asset.TiledMap", {
         this._checkImage();
     },
 
-    //アセットに無いイメージデータを読み込み
+    /**
+     * @method _checkImage
+     * アセットに無いイメージデータをチェックして読み込みを行います。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _checkImage: function() {
         var that = this;
         var imageSource = [];
@@ -194,7 +306,7 @@ phina.define("phina.asset.TiledMap", {
         };
         for (var i = 0; i < loadImage.length; i++) {
             //イメージのパスをマップと同じにする
-            assets.image[imageSource[i].image] = this.path+imageSource[i].image;
+            assets.image[loadImage[i].image] = this.path+loadImage[i].image;
         }
         if (loadImage.length) {
             var loader = phina.asset.AssetLoader();
@@ -213,85 +325,32 @@ phina.define("phina.asset.TiledMap", {
                         });
                     }
                 });
-                //マップイメージ生成
-                that.image = that._generateImage();
                 //読み込み終了
                 that._resolve(that);
             }.bind(this));
         } else {
-            //マップイメージ生成
-            this.image = that._generateImage();
             //読み込み終了
             this._resolve(that);
         }
     },
 
-    //マップイメージ作成
-    _generateImage: function(layerName) {
-        var numLayer = 0;
-        for (var i = 0; i < this.layers.length; i++) {
-            if (this.layers[i].type == "layer" || this.layers[i].type == "imagelayer") numLayer++;
-        }
-        if (numLayer == 0) return null;
-
-        var width = this.width * this.tilewidth;
-        var height = this.height * this.tileheight;
-        var canvas = phina.graphics.Canvas().setSize(width, height);
-
-        for (var i = 0; i < this.layers.length; i++) {
-            //マップレイヤー
-            if (this.layers[i].type == "layer" && this.layers[i].visible != "0") {
-                if (layerName === undefined || layerName === this.layers[i].name) {
-                    var layer = this.layers[i];
-                    var mapdata = layer.data;
-                    var width = layer.width;
-                    var height = layer.height;
-                    var opacity = layer.opacity || 1.0;
-                    var count = 0;
-                    for (var y = 0; y < height; y++) {
-                        for (var x = 0; x < width; x++) {
-                            var index = mapdata[count];
-                                if (index !== -1) {
-                                //マップチップを配置
-                                this._setMapChip(canvas, index, x * this.tilewidth, y * this.tileheight, opacity);
-                            }
-                            count++;
-                        }
-                    }
-                }
-            }
-            //オブジェクトグループ
-            if (this.layers[i].type == "objectgroup" && this.layers[i].visible != "0") {
-                if (layerName === undefined || layerName === this.layers[i].name) {
-                    var layer = this.layers[i];
-                    var opacity = layer.opacity || 1.0;
-                    layer.objects.forEach(function(e) {
-                        if (e.gid) {
-                            this._setMapChip(canvas, e.gid, e.x, e.y, opacity);
-                        }
-                    }.bind(this));
-                }
-            }
-            //イメージレイヤー
-            if (this.layers[i].type == "imagelayer" && this.layers[i].visible != "0") {
-                if (layerName === undefined || layerName === this.layers[i].name) {
-                    var len = this.layers[i];
-                    var image = phina.asset.AssetManager.get('image', this.layers[i].image.source);
-                    canvas.context.drawImage(image.domElement, this.layers[i].x, this.layers[i].y);
-                }
-            }
-        }
-
-        var texture = phina.asset.Texture();
-        texture.domElement = canvas.domElement;
-        return texture;
-    },
-
-    //キャンバスの指定した座標にマップチップのイメージをコピーする
+    /**
+     * @method _setMapChip
+     * キャンバスの指定した座標にマップチップのイメージをコピーします。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _setMapChip: function(canvas, index, x, y, opacity) {
         //タイルセットからマップチップを取得
         var chip = this.tilesets.chips[index];
+        if (!chip) {
+            return;
+        }
         var image = phina.asset.AssetManager.get('image', chip.image);
+        if (!image) {
+            console.log(chip.image);
+        }
         canvas.context.drawImage(
             image.domElement,
             chip.x + chip.margin, chip.y + chip.margin,
@@ -300,7 +359,13 @@ phina.define("phina.asset.TiledMap", {
             chip.tilewidth, chip.tileheight);
     },
 
-    //XMLプロパティをJSONに変換
+    /**
+     * @method _propertiesToJSON
+     * XMLプロパティをJSONに変換します。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _propertiesToJSON: function(elm) {
         var properties = elm.getElementsByTagName("properties")[0];
         var obj = {};
@@ -329,7 +394,13 @@ phina.define("phina.asset.TiledMap", {
         return obj;
     },
 
-    //XML属性をJSONに変換
+    /**
+     * @method _propertiesToJSON
+     * XML属性情報をJSONに変換します。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _attrToJSON: function(source) {
         var obj = {};
         for (var i = 0; i < source.attributes.length; i++) {
@@ -340,7 +411,13 @@ phina.define("phina.asset.TiledMap", {
         return obj;
     },
 
-    //XML属性をJSONに変換（Stringで返す）
+    /**
+     * @method _propertiesToJSON_str
+     * XMLプロパティをJSONに変換し、文字列で返します。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _attrToJSON_str: function(source) {
         var obj = {};
         for (var i = 0; i < source.attributes.length; i++) {
@@ -350,7 +427,13 @@ phina.define("phina.asset.TiledMap", {
         return obj;
     },
 
-    //タイルセットのパース
+    /**
+     * @method _parseTilesets
+     * タイルセットのパースを行います。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _parseTilesets: function(xml) {
         var each = Array.prototype.forEach;
         var self = this;
@@ -377,7 +460,13 @@ phina.define("phina.asset.TiledMap", {
         return data;
     },
 
-    //レイヤー情報のパース
+    /**
+     * @method _parseLayers
+     * レイヤー情報のパースを行います。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _parseLayers: function(xml) {
         var each = Array.prototype.forEach;
         var data = [];
@@ -426,9 +515,13 @@ phina.define("phina.asset.TiledMap", {
                         color: layer.getAttribute("color") || null,
                         draworder: layer.getAttribute("draworder") || null,
                     };
+                    l.properties = this._propertiesToJSON(layer);
+
+                    //レイヤー内解析
                     each.call(layer.childNodes, function(elm) {
                         if (elm.nodeType == 3) return;
                         var d = this._attrToJSON(elm);
+                        if (d.id === undefined) return;
                         d.properties = this._propertiesToJSON(elm);
                         //子要素の解析
                         if (elm.childNodes.length) {
@@ -462,7 +555,6 @@ phina.define("phina.asset.TiledMap", {
                         }
                         l.objects.push(d);
                     }.bind(this));
-                    l.properties = this._propertiesToJSON(layer);
 
                     data.push(l);
                     break;
@@ -487,7 +579,13 @@ phina.define("phina.asset.TiledMap", {
         return data;
     },
 
-    //CSVパース
+    /**
+     * @method _perseCSV
+     * CSVのパースを行います。
+     *
+     * 内部で使用している関数です。
+     * @private
+     */
     _parseCSV: function(data) {
         var dataList = data.split(',');
         var layer = [];
@@ -501,7 +599,10 @@ phina.define("phina.asset.TiledMap", {
     },
 
     /**
-     * BASE64パース
+     * @method _perseCSV
+     * BASE64のパースを行います。
+     *
+     * 内部で使用している関数です。
      * http://thekannon-server.appspot.com/herpity-derpity.appspot.com/pastebin.com/75Kks0WH
      * @private
      */
