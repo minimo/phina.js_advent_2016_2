@@ -28,7 +28,7 @@ phina.define('MainScene', {
 
     //.tmxファイルからマップをイメージとして取得し、スプライトで表示
     this.tmx = phina.asset.AssetManager.get("tmx", "map");
-    this.map = phina.display.Sprite(this.tmx.image)
+    this.map = phina.display.Sprite(this.tmx.getImage())
       .setOrigin(0, 0)
       .setPosition(0, 0)
       .addChildTo(this.mapBase);
